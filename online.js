@@ -20,10 +20,13 @@ const onlineEls = {
   joinRoomBtn: document.getElementById('joinRoomBtn'),
   roomCodeDisplay: document.getElementById('roomCodeDisplay'),
   lobbyPlayerList: document.getElementById('lobbyPlayerList'),
-  onlineStartBtn: document.getElementById('onlineStartBtn'),
+  lobbyHostButtons: document.getElementById('lobbyHostButtons'),
+  onlineStartManualBtn: document.getElementById('onlineStartManualBtn'),
+  onlineStartRandomBtn: document.getElementById('onlineStartRandomBtn'),
   lobbyWaitingText: document.getElementById('lobbyWaitingText'),
   hostChooseView: document.getElementById('hostChooseView'),
   clientWaitView: document.getElementById('clientWaitView'),
+  soundSearchInput: document.getElementById('soundSearchInput'),
   hostSoundList: document.getElementById('hostSoundList'),
   hostConfirmSoundBtn: document.getElementById('hostConfirmSoundBtn'),
   hostRandomSoundBtn: document.getElementById('hostRandomSoundBtn'),
@@ -172,17 +175,22 @@ function renderLobby(room, players) {
     li.textContent = players[uid].name + (uid === room.hostId ? ' 👑' : '');
     onlineEls.lobbyPlayerList.appendChild(li);
   });
-  onlineEls.onlineStartBtn.hidden = !onlineState.isHost;
-  onlineEls.onlineStartBtn.disabled = room.playerOrder.length < 2;
+  // Montrer les boutons de mode seulement à l'hôte
+  onlineEls.lobbyHostButtons.hidden = !onlineState.isHost;
   onlineEls.lobbyWaitingText.hidden = onlineState.isHost;
   onlineEls.createRoomBtn.disabled = false;
   onlineEls.joinRoomBtn.disabled = false;
   showScreen('online-lobby');
 }
 
-onlineEls.onlineStartBtn.addEventListener('click', () => {
+onlineEls.onlineStartManualBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
-  socket.emit('update_state', { status: 'host_choose', round: 1 });
+  socket.emit('update_state', { status: 'host_choose', round: 1, roundMode: 'manual' });
+});
+
+onlineEls.onlineStartRandomBtn.addEventListener('click', () => {
+  if (!onlineState.isHost) return;
+  socket.emit('update_state', { status: 'host_choose', round: 1, roundMode: 'random' });
 });
 
 /* ─────────────── CHOIX DU SON (hôte) ─────────────── */
@@ -190,29 +198,53 @@ function renderHostChoose(room) {
   els.topbarInfo.hidden = false;
   els.roundLabel.textContent = `Manche ${room.round}`;
   renderScorebar(room);
+
+  // En mode aléatoire, l'hôte n'a pas besoin de choisir : on lance directement
+  if (room.roundMode === 'random' && onlineState.isHost) {
+    if (!state.sounds || state.sounds.length === 0) return;
+    const randomIdx = Math.floor(Math.random() * state.sounds.length);
+    startRoundWithSound(randomIdx);
+    return;
+  }
+
   onlineEls.hostChooseView.hidden = !onlineState.isHost;
   onlineEls.clientWaitView.hidden = onlineState.isHost;
 
   if (onlineState.isHost && onlineEls.hostSoundList.children.length === 0) {
-    state.sounds.forEach((s, idx) => {
-      const li = document.createElement('li');
-      li.textContent = s.label;
-      const playBtn = document.createElement('button');
-      playBtn.textContent = '▶';
-      playBtn.className = 'btn btn-ghost';
-      playBtn.onclick = (e) => { e.stopPropagation(); onlineAudio.src = s.url; onlineAudio.play(); };
-      li.appendChild(playBtn);
-      li.onclick = () => {
-        Array.from(onlineEls.hostSoundList.children).forEach(c => c.classList.remove('selected'));
-        li.classList.add('selected');
-        onlineState.selectedSoundIndex = idx;
-        onlineEls.hostConfirmSoundBtn.disabled = false;
-      };
-      onlineEls.hostSoundList.appendChild(li);
-    });
+    buildSoundList();
   }
   showScreen('host-choose');
 }
+
+function buildSoundList(filter = '') {
+  onlineEls.hostSoundList.innerHTML = '';
+  const q = filter.toLowerCase();
+  state.sounds.forEach((s, idx) => {
+    if (q && !s.label.toLowerCase().includes(q)) return;
+    const li = document.createElement('li');
+    li.textContent = s.label;
+    const playBtn = document.createElement('button');
+    playBtn.textContent = '▶';
+    playBtn.className = 'btn btn-ghost';
+    playBtn.onclick = (e) => { e.stopPropagation(); onlineAudio.src = s.url; onlineAudio.play(); };
+    li.appendChild(playBtn);
+    li.onclick = () => {
+      Array.from(onlineEls.hostSoundList.children).forEach(c => c.classList.remove('selected'));
+      li.classList.add('selected');
+      onlineState.selectedSoundIndex = idx;
+      onlineEls.hostConfirmSoundBtn.disabled = false;
+    };
+    onlineEls.hostSoundList.appendChild(li);
+  });
+}
+
+// Barre de recherche
+onlineEls.soundSearchInput.addEventListener('input', (e) => {
+  buildSoundList(e.target.value);
+  // Réinitialiser la sélection si elle n'est plus visible
+  onlineState.selectedSoundIndex = null;
+  onlineEls.hostConfirmSoundBtn.disabled = true;
+});
 
 // Fonction partagée pour lancer l'enregistrement avec un son donné
 function startRoundWithSound(soundIndex) {
@@ -417,13 +449,15 @@ function renderRoundResults(room, players) {
 
 onlineEls.nextRoundBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
-  // Réinitialiser la liste des sons pour pouvoir recliquer
+  // Réinitialiser la liste des sons et la recherche
   onlineEls.hostSoundList.innerHTML = '';
+  onlineEls.soundSearchInput.value = '';
   onlineEls.hostConfirmSoundBtn.disabled = true;
   onlineState.selectedSoundIndex = null;
   socket.emit('update_state', {
     status: 'host_choose',
     round: onlineState.roomState.round + 1,
+    roundMode: onlineState.roomState.roundMode || 'manual', // conserver le mode
     soundIndex: null,
     votes: {},
     playbackCursor: -1

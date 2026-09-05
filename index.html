@@ -118,7 +118,11 @@
       <h2 class="room-code" id="roomCodeDisplay">ABCD</h2>
       <p class="muted">Donne ce code aux autres pour qu'ils te rejoignent.</p>
       <ul class="player-list" id="lobbyPlayerList"></ul>
-      <button class="btn btn-primary btn-big" id="onlineStartBtn" hidden>Lancer la partie</button>
+      <!-- L'hôte choisit le mode avant de lancer -->
+      <div id="lobbyHostButtons" hidden style="display:flex; flex-direction:column; gap:10px; width:100%; margin-top:8px;">
+        <button class="btn btn-primary btn-big" id="onlineStartManualBtn">🎵 L'hôte choisit le son</button>
+        <button class="btn btn-secondary btn-big" id="onlineStartRandomBtn">🎲 Son aléatoire à chaque manche</button>
+      </div>
       <p class="muted" id="lobbyWaitingText">En attente que l'hôte lance la partie…</p>
     </div>
   </section>
@@ -129,6 +133,7 @@
       <div id="hostChooseView" hidden>
         <h2>Choisis le son de cette manche</h2>
         <p class="muted">Écoute un son pour le tester, puis valide.</p>
+        <input type="search" id="soundSearchInput" class="input" placeholder="🔍 Rechercher un son..." style="width:100%; margin-bottom:10px; margin-top:8px;">
         <ul class="sound-list" id="hostSoundList">
           <!-- Populated dynamically -->
         </ul>
