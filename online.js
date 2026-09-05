@@ -119,6 +119,16 @@ function switchOnlineTab(which){
   onlineEls.joinPane.hidden = isCreate;
 }
 
+const peerConfig = {
+  debug: 2,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  }
+};
+
 /* --------------------------- Créer / Rejoindre --------------------------- */
 
 onlineEls.createRoomBtn.addEventListener('click', () => {
@@ -129,7 +139,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
   const uid = getOrCreateUid();
   const code = randomRoomCode();
   
-  onlineState.peer = new Peer('echoparty-host-' + code);
+  onlineState.peer = new Peer('echoparty-host-' + code, peerConfig);
   
   onlineState.peer.on('open', () => {
     onlineState.uid = uid;
@@ -144,7 +154,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
       soundIndex: null,
       playbackCursor: -1,
       timerEndsAt: null,
-      votes: {}, // voterUid -> targetUid
+      votes: {},
     };
     broadcastState();
     onlineEls.createRoomBtn.disabled = false;
@@ -181,17 +191,16 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
   onlineEls.joinRoomBtn.disabled = true;
   const uid = getOrCreateUid();
   
-  // Timeout de secours au cas où PeerJS freeze silencieusement
   let joinTimeout = setTimeout(() => {
-    showOnlineError("Délai d'attente dépassé. L'hôte est-il bien connecté avec ce code ?");
+    showOnlineError("Délai d'attente dépassé (15s). Connexion impossible. Vérifiez vos pare-feux ou réessayez.");
     onlineEls.joinRoomBtn.disabled = false;
     if(onlineState.peer) onlineState.peer.destroy();
-  }, 10000);
+  }, 15000);
 
-  onlineState.peer = new Peer();
+  onlineState.peer = new Peer(peerConfig);
   
   onlineState.peer.on('open', () => {
-    onlineState.hostConn = onlineState.peer.connect('echoparty-host-' + code, { reliable: true });
+    onlineState.hostConn = onlineState.peer.connect('echoparty-host-' + code); // Removed { reliable: true }
     
     onlineState.hostConn.on('open', () => {
       clearTimeout(joinTimeout);
