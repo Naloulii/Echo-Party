@@ -267,7 +267,7 @@ function startRoundWithSound(soundIndex) {
     socket.emit('update_state', {
       status: 'recording',
       soundIndex,
-      timerEndsAt: Date.now() + 2000 + Math.ceil(dur)
+      timerEndsAt: Date.now() + Math.ceil(dur) * 2 + 3000
     });
   };
 
@@ -299,13 +299,15 @@ onlineEls.hostRandomSoundBtn.addEventListener('click', () => {
 /* ─────────────── ENREGISTREMENT ─────────────── */
 let mediaRecorder = null;
 let recordingChunks = [];
-let recordingTimeout = null;
+let localRecordingActive = false;
 
-function renderRecording(room) {
+async function renderRecording(room) {
   showScreen('recording');
   onlineEls.recordingStatusText.hidden = true;
   onlineEls.recordingUploadText.hidden = true;
-  onlineEls.recordingInstruction.textContent = 'Préparez-vous...';
+  
+  if (localRecordingActive) return;
+  localRecordingActive = true;
 
   const sound = state.sounds[room.soundIndex];
   onlineAudio.src = sound.url;
@@ -313,61 +315,82 @@ function renderRecording(room) {
     onlineAudio.setSinkId(state.deviceIdOut).catch(() => {});
   }
 
-  const timeUntilEnd = room.timerEndsAt - Date.now();
+  // 1. Déterminer la durée du son
+  await new Promise(r => {
+    onlineAudio.onloadedmetadata = r;
+    onlineAudio.onerror = r;
+    onlineAudio.load();
+    setTimeout(r, 2000); // 2s max d'attente
+  });
+  const dur = onlineAudio.duration && isFinite(onlineAudio.duration) ? onlineAudio.duration * 1000 : 5000;
+
+  // 2. Écouter le son
+  onlineEls.recordingInstruction.textContent = 'ÉCOUTEZ LE SON...';
+  onlineEls.recordingTimerValue.textContent = '🎵';
+  onlineAudio.currentTime = 0;
+  onlineAudio.play().catch(() => {});
+  await new Promise(r => setTimeout(r, dur));
+
+  // 3. Compte à rebours 3 secondes
+  for (let i = 3; i > 0; i--) {
+    onlineEls.recordingInstruction.textContent = `${i}...`;
+    onlineEls.recordingTimerValue.textContent = i;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  // 4. Enregistrement (durée = dur)
+  onlineEls.recordingInstruction.textContent = 'IMITEZ MAINTENANT !';
+  onlineEls.recordingStatusText.hidden = false;
+  onlineEls.recordingWaveform.classList.add('playing');
+  
+  let timeLeft = Math.ceil(dur / 1000);
+  onlineEls.recordingTimerValue.textContent = timeLeft;
   clearInterval(onlineState.timerInterval);
   onlineState.timerInterval = setInterval(() => {
-    const left = Math.max(0, Math.round((room.timerEndsAt - Date.now()) / 1000));
-    onlineEls.recordingTimerValue.textContent = left;
-  }, 500);
+    timeLeft--;
+    onlineEls.recordingTimerValue.textContent = Math.max(0, timeLeft);
+  }, 1000);
 
-  // Le serveur a ajouté 2000ms au timer. Moins un peu de latence réseau, on donne ~1800ms de prep
-  const prepDelay = 1800;
-  
-  // On attend le délai de préparation, puis on joue et enregistre
-  setTimeout(async () => {
-    onlineEls.recordingInstruction.textContent = 'IMITEZ MAINTENANT !';
-    onlineEls.recordingStatusText.hidden = false;
-    onlineEls.recordingWaveform.classList.add('playing');
-    onlineAudio.currentTime = 0;
-    onlineAudio.play().catch(() => {});
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: state.deviceIdIn ? { deviceId: { exact: state.deviceIdIn } } : true
+    });
+    mediaRecorder = new MediaRecorder(stream);
+    recordingChunks = [];
+    mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      onlineEls.recordingWaveform.classList.remove('playing');
+      onlineEls.recordingStatusText.hidden = true;
+      onlineEls.recordingUploadText.hidden = false;
+      clearInterval(onlineState.timerInterval);
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: state.deviceIdIn ? { deviceId: { exact: state.deviceIdIn } } : true
-      });
-      mediaRecorder = new MediaRecorder(stream);
-      recordingChunks = [];
-      mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
-      mediaRecorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        onlineEls.recordingWaveform.classList.remove('playing');
-        onlineEls.recordingStatusText.hidden = true;
-        onlineEls.recordingUploadText.hidden = false;
-
-        const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          socket.emit('submit_audio', {
-            uid: onlineState.uid,
-            b64: reader.result,
-            mimeType: mediaRecorder.mimeType
-          });
-        };
-        reader.readAsDataURL(blob);
+      const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        socket.emit('submit_audio', {
+          uid: onlineState.uid,
+          b64: reader.result,
+          mimeType: mediaRecorder.mimeType
+        });
+        localRecordingActive = false;
       };
-      mediaRecorder.start();
-    } catch (err) {
-      console.error('Micro inaccessible:', err);
-      // Soumettre un silence vide pour ne pas bloquer les autres
-      socket.emit('submit_audio', { uid: onlineState.uid, b64: '', mimeType: 'audio/webm' });
-    }
-  }, 2000);
+      reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();
 
-  clearTimeout(recordingTimeout);
-  recordingTimeout = setTimeout(() => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-  }, Math.max(3000, timeUntilEnd));
+    // Arrêt auto
+    setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    }, dur);
+
+  } catch (err) {
+    console.error('Micro inaccessible:', err);
+    localRecordingActive = false;
+    socket.emit('submit_audio', { uid: onlineState.uid, b64: '', mimeType: 'audio/webm' });
+  }
 }
+
 
 /* ─────────────── PLAYBACK ─────────────── */
 function playBase64Audio(b64, mimeType) {
@@ -427,9 +450,15 @@ function renderVoting(room, players) {
     onlineEls.votingGrid.appendChild(btn);
   });
 
+  // Gérer le chrono localement pour éviter le décalage (clock skew)
+  if (onlineState.votingRound !== room.round) {
+    onlineState.votingRound = room.round;
+    onlineState.localVotingEndsAt = Date.now() + 15000;
+  }
+
   clearInterval(onlineState.timerInterval);
   onlineState.timerInterval = setInterval(() => {
-    const left = Math.max(0, Math.round((room.timerEndsAt - Date.now()) / 1000));
+    const left = Math.max(0, Math.round((onlineState.localVotingEndsAt - Date.now()) / 1000));
     onlineEls.votingTimerValue.textContent = left;
     if (left <= 0) {
       clearInterval(onlineState.timerInterval);
