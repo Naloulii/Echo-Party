@@ -250,12 +250,11 @@ onlineEls.soundSearchInput.addEventListener('input', (e) => {
 function startRoundWithSound(soundIndex) {
   const s = state.sounds[soundIndex];
   if (!s) return;
-  
-  // Méthode fiable: on estime la durée depuis l'URL ou on utilise un fallback
-  const tempA = new Audio();
-  tempA.preload = 'metadata';
-  
+
+  let proceeded = false;
   const proceed = (dur) => {
+    if (proceeded) return;
+    proceeded = true;
     socket.emit('update_state', {
       status: 'recording',
       soundIndex,
@@ -263,10 +262,17 @@ function startRoundWithSound(soundIndex) {
     });
   };
 
+  // Essaie de lire la durée exacte depuis les métadonnées
+  const tempA = new Audio();
+  tempA.preload = 'metadata';
   tempA.onloadedmetadata = () => proceed(tempA.duration * 1000);
-  tempA.onerror = () => proceed(5000); // fallback 5s si erreur
+  tempA.onerror = () => proceed(5000);
   tempA.src = s.url;
   tempA.load();
+
+  // Sécurité : si les métadonnées ne chargent jamais (CORS, etc.)
+  // on lance quand même après 2 secondes avec un fallback de 5s
+  setTimeout(() => proceed(5000), 2000);
 }
 
 onlineEls.hostConfirmSoundBtn.addEventListener('click', () => {
