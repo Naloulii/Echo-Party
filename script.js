@@ -5,7 +5,6 @@
 const els = {
   topbarInfo: document.getElementById('topbarInfo'),
   roundLabel: document.getElementById('roundLabel'),
-  soundsLeftLabel: document.getElementById('soundsLeftLabel'),
 
   screens: {
     loading: document.getElementById('screen-loading'),
