@@ -180,12 +180,21 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
 
   onlineEls.joinRoomBtn.disabled = true;
   const uid = getOrCreateUid();
+  
+  // Timeout de secours au cas où PeerJS freeze silencieusement
+  let joinTimeout = setTimeout(() => {
+    showOnlineError("Délai d'attente dépassé. L'hôte est-il bien connecté avec ce code ?");
+    onlineEls.joinRoomBtn.disabled = false;
+    if(onlineState.peer) onlineState.peer.destroy();
+  }, 10000);
+
   onlineState.peer = new Peer();
   
   onlineState.peer.on('open', () => {
     onlineState.hostConn = onlineState.peer.connect('echoparty-host-' + code, { reliable: true });
     
     onlineState.hostConn.on('open', () => {
+      clearTimeout(joinTimeout);
       onlineState.uid = uid;
       onlineState.code = code;
       onlineState.isHost = false;
@@ -199,9 +208,18 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     });
 
     onlineState.hostConn.on('close', () => showOnlineError('Hôte déconnecté.'));
+    
+    onlineState.hostConn.on('error', (err) => {
+      clearTimeout(joinTimeout);
+      console.error("Connection error:", err);
+      showOnlineError("Erreur de connexion avec l'hôte.");
+      onlineEls.joinRoomBtn.disabled = false;
+    });
   });
 
-  onlineState.peer.on('error', () => {
+  onlineState.peer.on('error', (err) => {
+    clearTimeout(joinTimeout);
+    console.error("PeerJS error:", err);
     showOnlineError("Impossible de rejoindre la partie. Vérifie le code.");
     onlineEls.joinRoomBtn.disabled = false;
   });
