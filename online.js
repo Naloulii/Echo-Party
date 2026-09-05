@@ -119,16 +119,6 @@ function switchOnlineTab(which){
   onlineEls.joinPane.hidden = isCreate;
 }
 
-const peerConfig = {
-  debug: 2,
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  }
-};
-
 /* --------------------------- Créer / Rejoindre --------------------------- */
 
 onlineEls.createRoomBtn.addEventListener('click', () => {
@@ -139,7 +129,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
   const uid = getOrCreateUid();
   const code = randomRoomCode();
   
-  onlineState.peer = new Peer('echoparty-host-' + code, peerConfig);
+  onlineState.peer = new Peer('echoparty-v2-host-' + code);
   
   onlineState.peer.on('open', () => {
     onlineState.uid = uid;
@@ -197,33 +187,36 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     if(onlineState.peer) onlineState.peer.destroy();
   }, 15000);
 
-  onlineState.peer = new Peer(peerConfig);
+  onlineState.peer = new Peer();
   
   onlineState.peer.on('open', () => {
-    onlineState.hostConn = onlineState.peer.connect('echoparty-host-' + code); // Removed { reliable: true }
-    
-    onlineState.hostConn.on('open', () => {
-      clearTimeout(joinTimeout);
-      onlineState.uid = uid;
-      onlineState.code = code;
-      onlineState.isHost = false;
-      onlineState.hostConn.send({ type: 'join', uid, name });
-      onlineEls.joinRoomBtn.disabled = false;
-    });
+    // Petit délai pour laisser le temps au serveur PeerJS d'enregistrer le client
+    setTimeout(() => {
+      onlineState.hostConn = onlineState.peer.connect('echoparty-v2-host-' + code);
+      
+      onlineState.hostConn.on('open', () => {
+        clearTimeout(joinTimeout);
+        onlineState.uid = uid;
+        onlineState.code = code;
+        onlineState.isHost = false;
+        onlineState.hostConn.send({ type: 'join', uid, name });
+        onlineEls.joinRoomBtn.disabled = false;
+      });
 
-    onlineState.hostConn.on('data', (data) => {
-      if(data.type === 'state') renderRoom(data.state);
-      else if(data.type === 'playback_audio') playReceivedBlob(data.blob, data.uid);
-    });
+      onlineState.hostConn.on('data', (data) => {
+        if(data.type === 'state') renderRoom(data.state);
+        else if(data.type === 'playback_audio') playReceivedBlob(data.blob, data.uid);
+      });
 
-    onlineState.hostConn.on('close', () => showOnlineError('Hôte déconnecté.'));
-    
-    onlineState.hostConn.on('error', (err) => {
-      clearTimeout(joinTimeout);
-      console.error("Connection error:", err);
-      showOnlineError("Erreur de connexion : " + err.type + " - " + err.message);
-      onlineEls.joinRoomBtn.disabled = false;
-    });
+      onlineState.hostConn.on('close', () => showOnlineError('Hôte déconnecté.'));
+      
+      onlineState.hostConn.on('error', (err) => {
+        clearTimeout(joinTimeout);
+        console.error("Connection error:", err);
+        showOnlineError("Erreur de connexion : " + err.type + " - " + err.message);
+        onlineEls.joinRoomBtn.disabled = false;
+      });
+    }, 500);
   });
 
   onlineState.peer.on('error', (err) => {
