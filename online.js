@@ -26,6 +26,7 @@ const onlineEls = {
   clientWaitView: document.getElementById('clientWaitView'),
   hostSoundList: document.getElementById('hostSoundList'),
   hostConfirmSoundBtn: document.getElementById('hostConfirmSoundBtn'),
+  hostRandomSoundBtn: document.getElementById('hostRandomSoundBtn'),
   recordingInstruction: document.getElementById('recordingInstruction'),
   recordingTimerRing: document.getElementById('recordingTimerRing'),
   recordingTimerValue: document.getElementById('recordingTimerValue'),
@@ -213,25 +214,39 @@ function renderHostChoose(room) {
   showScreen('host-choose');
 }
 
+// Fonction partagée pour lancer l'enregistrement avec un son donné
+function startRoundWithSound(soundIndex) {
+  const s = state.sounds[soundIndex];
+  if (!s) return;
+  
+  // Méthode fiable: on estime la durée depuis l'URL ou on utilise un fallback
+  const tempA = new Audio();
+  tempA.preload = 'metadata';
+  
+  const proceed = (dur) => {
+    socket.emit('update_state', {
+      status: 'recording',
+      soundIndex,
+      timerEndsAt: Date.now() + 2000 + Math.ceil(dur)
+    });
+  };
+
+  tempA.onloadedmetadata = () => proceed(tempA.duration * 1000);
+  tempA.onerror = () => proceed(5000); // fallback 5s si erreur
+  tempA.src = s.url;
+  tempA.load();
+}
+
 onlineEls.hostConfirmSoundBtn.addEventListener('click', () => {
   if (!onlineState.isHost || onlineState.selectedSoundIndex === null) return;
-  const s = state.sounds[onlineState.selectedSoundIndex];
-  const tempA = new Audio(s.url);
-  tempA.onloadedmetadata = () => {
-    const dur = Math.ceil(tempA.duration * 1000);
-    socket.emit('update_state', {
-      status: 'recording',
-      soundIndex: onlineState.selectedSoundIndex,
-      timerEndsAt: Date.now() + 2000 + dur
-    });
-  };
-  tempA.onerror = () => {
-    socket.emit('update_state', {
-      status: 'recording',
-      soundIndex: onlineState.selectedSoundIndex,
-      timerEndsAt: Date.now() + 7000
-    });
-  };
+  startRoundWithSound(onlineState.selectedSoundIndex);
+});
+
+onlineEls.hostRandomSoundBtn.addEventListener('click', () => {
+  if (!onlineState.isHost) return;
+  if (!state.sounds || state.sounds.length === 0) return;
+  const randomIdx = Math.floor(Math.random() * state.sounds.length);
+  startRoundWithSound(randomIdx);
 });
 
 /* ─────────────── ENREGISTREMENT ─────────────── */
