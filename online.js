@@ -119,6 +119,17 @@ function switchOnlineTab(which){
   onlineEls.joinPane.hidden = isCreate;
 }
 
+const peerConfig = {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.1.google.com:19302' }
+    ]
+  }
+};
+
 /* --------------------------- Créer / Rejoindre --------------------------- */
 
 onlineEls.createRoomBtn.addEventListener('click', () => {
@@ -129,7 +140,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
   const uid = getOrCreateUid();
   const code = randomRoomCode();
   
-  onlineState.peer = new Peer('echoparty-v2-host-' + code);
+  onlineState.peer = new Peer('echoparty-v3-host-' + code, peerConfig);
   
   onlineState.peer.on('open', () => {
     onlineState.uid = uid;
@@ -190,12 +201,12 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     if(onlineState.peer) onlineState.peer.destroy();
   }, 15000);
 
-  onlineState.peer = new Peer();
+  onlineState.peer = new Peer(peerConfig);
   
   onlineState.peer.on('open', () => {
     // Petit délai pour laisser le temps au serveur PeerJS d'enregistrer le client
     setTimeout(() => {
-      onlineState.hostConn = onlineState.peer.connect('echoparty-v2-host-' + code);
+      onlineState.hostConn = onlineState.peer.connect('echoparty-v3-host-' + code, { reliable: true });
       
       onlineState.hostConn.on('open', () => {
         clearTimeout(joinTimeout);
