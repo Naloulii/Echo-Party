@@ -16,11 +16,10 @@ const onlineEls = {
   createNameInput: document.getElementById('createNameInput'),
   createRoomBtn: document.getElementById('createRoomBtn'),
   joinNameInput: document.getElementById('joinNameInput'),
-  joinCodeInput: document.getElementById('joinCodeInput'),
-  joinRoomBtn: document.getElementById('joinRoomBtn'),
   roomCodeDisplay: document.getElementById('roomCodeDisplay'),
   lobbyPlayerList: document.getElementById('lobbyPlayerList'),
   lobbyHostButtons: document.getElementById('lobbyHostButtons'),
+  lobbyMaxRounds: document.getElementById('lobbyMaxRounds'),
   onlineStartManualBtn: document.getElementById('onlineStartManualBtn'),
   onlineStartRandomBtn: document.getElementById('onlineStartRandomBtn'),
   lobbyWaitingText: document.getElementById('lobbyWaitingText'),
@@ -185,18 +184,20 @@ function renderLobby(room, players) {
 
 onlineEls.onlineStartManualBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
-  socket.emit('update_state', { status: 'host_choose', round: 1, roundMode: 'manual' });
+  const max = parseInt(onlineEls.lobbyMaxRounds.value) || 5;
+  socket.emit('update_state', { status: 'host_choose', round: 1, maxRounds: max, roundMode: 'manual' });
 });
 
 onlineEls.onlineStartRandomBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
-  socket.emit('update_state', { status: 'host_choose', round: 1, roundMode: 'random' });
+  const max = parseInt(onlineEls.lobbyMaxRounds.value) || 5;
+  socket.emit('update_state', { status: 'host_choose', round: 1, maxRounds: max, roundMode: 'random' });
 });
 
 /* ─────────────── CHOIX DU SON (hôte) ─────────────── */
 function renderHostChoose(room) {
   els.topbarInfo.hidden = false;
-  els.roundLabel.textContent = `Manche ${room.round}`;
+  els.roundLabel.textContent = `Manche ${room.round} / ${room.maxRounds || '?'}`;
   renderScorebar(room);
 
   // En mode aléatoire, l'hôte n'a pas besoin de choisir : on lance directement
@@ -448,6 +449,10 @@ function renderRoundResults(room, players) {
   });
 
   onlineEls.nextRoundBtn.hidden = !onlineState.isHost;
+  if (onlineState.isHost) {
+    const isLastRound = room.round >= (room.maxRounds || 5);
+    onlineEls.nextRoundBtn.textContent = isLastRound ? 'Terminer la partie' : 'Manche suivante';
+  }
   onlineEls.roundResultWaitText.hidden = onlineState.isHost;
   renderScorebar(room);
   showScreen('round-results');
@@ -455,6 +460,15 @@ function renderRoundResults(room, players) {
 
 onlineEls.nextRoundBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
+  
+  const currentRound = onlineState.roomState.round;
+  const maxRounds = onlineState.roomState.maxRounds || 5;
+
+  if (currentRound >= maxRounds) {
+    socket.emit('update_state', { status: 'end' });
+    return;
+  }
+
   // Réinitialiser la liste des sons et la recherche
   onlineEls.hostSoundList.innerHTML = '';
   onlineEls.soundSearchInput.value = '';
@@ -462,7 +476,7 @@ onlineEls.nextRoundBtn.addEventListener('click', () => {
   onlineState.selectedSoundIndex = null;
   socket.emit('update_state', {
     status: 'host_choose',
-    round: onlineState.roomState.round + 1,
+    round: currentRound + 1,
     roundMode: onlineState.roomState.roundMode || 'manual', // conserver le mode
     soundIndex: null,
     votes: {},
