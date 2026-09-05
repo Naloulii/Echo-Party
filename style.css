@@ -491,3 +491,46 @@ code{
   .panel{ padding:26px 18px; }
   .player-name-big{ font-size:2.1rem; }
 }
+/* New UI Elements */
+.audio-visualizer-container {
+  margin-top: 15px;
+  background: var(--surface);
+  padding: 15px;
+  border-radius: var(--radius);
+}
+.meter {
+  height: 10px;
+  background: var(--bg);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+.meter-fill {
+  height: 100%;
+  background: var(--success);
+  width: 0%;
+  transition: width 0.1s ease-out;
+}
+.sound-list {
+  list-style: none;
+  padding: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.sound-list li {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sound-list li:last-child {
+  border-bottom: none;
+}
+.sound-list li.selected {
+  background: var(--surface);
+  font-weight: bold;
+}
+

@@ -1,76 +1,94 @@
 /* ------------------------------------------------------------------
-   Écho Party — mode en ligne (code de partie)
-   Repose sur PeerJS (P2P) pour synchroniser l'état de la partie.
+   Écho Party — mode en ligne P2P (Mimic Party Revamp)
 ------------------------------------------------------------------- */
 
 const onlineEls = {
-  home: document.getElementById('screen-online-home'),
+  // Setup & Home
   error: document.getElementById('onlineSetupError'),
-
   tabCreate: document.getElementById('tabCreate'),
   tabJoin: document.getElementById('tabJoin'),
   createPane: document.getElementById('createPane'),
   joinPane: document.getElementById('joinPane'),
-
   createNameInput: document.getElementById('createNameInput'),
-  onlineDurationSelect: document.getElementById('onlineDurationSelect'),
   createRoomBtn: document.getElementById('createRoomBtn'),
-
   joinNameInput: document.getElementById('joinNameInput'),
   joinCodeInput: document.getElementById('joinCodeInput'),
   joinRoomBtn: document.getElementById('joinRoomBtn'),
 
+  // Lobby
   roomCodeDisplay: document.getElementById('roomCodeDisplay'),
   lobbyPlayerList: document.getElementById('lobbyPlayerList'),
   onlineStartBtn: document.getElementById('onlineStartBtn'),
   lobbyWaitingText: document.getElementById('lobbyWaitingText'),
 
-  onlineIntroName: document.getElementById('onlineIntroName'),
-  onlineIntroSub: document.getElementById('onlineIntroSub'),
+  // Host Choose
+  hostChooseView: document.getElementById('hostChooseView'),
+  clientWaitView: document.getElementById('clientWaitView'),
+  hostSoundList: document.getElementById('hostSoundList'),
+  hostConfirmSoundBtn: document.getElementById('hostConfirmSoundBtn'),
 
-  onlinePlaySoundBtn: document.getElementById('onlinePlaySoundBtn'),
-  onlineWaveform: document.getElementById('onlineWaveform'),
-  onlineStartActingBtn: document.getElementById('onlineStartActingBtn'),
+  // Recording
+  recordingInstruction: document.getElementById('recordingInstruction'),
+  recordingTimerRing: document.getElementById('recordingTimerRing'),
+  recordingTimerValue: document.getElementById('recordingTimerValue'),
+  recordingStatusText: document.getElementById('recordingStatusText'),
+  recordingUploadText: document.getElementById('recordingUploadText'),
+  recordingWaveform: document.getElementById('recordingWaveform'),
 
-  onlineActEyebrow: document.getElementById('onlineActEyebrow'),
-  onlineActPlayerName: document.getElementById('onlineActPlayerName'),
-  onlineTimerValue: document.getElementById('onlineTimerValue'),
-  onlineActAsMime: document.getElementById('onlineActAsMime'),
-  onlineActAsGuesser: document.getElementById('onlineActAsGuesser'),
-  onlineEndActingBtn: document.getElementById('onlineEndActingBtn'),
-  onlineGuessedBtn: document.getElementById('onlineGuessedBtn'),
-  onlineGuessedConfirm: document.getElementById('onlineGuessedConfirm'),
+  // Playback
+  playbackPlayerName: document.getElementById('playbackPlayerName'),
+  playbackOriginalName: document.getElementById('playbackOriginalName'),
+  playbackWaveform: document.getElementById('playbackWaveform'),
+  playbackActions: document.getElementById('playbackActions'),
+  playbackReplayOriginalBtn: document.getElementById('playbackReplayOriginalBtn'),
+  playbackReplayImitationBtn: document.getElementById('playbackReplayImitationBtn'),
+  playbackNextBtn: document.getElementById('playbackNextBtn'),
+  playbackWaitText: document.getElementById('playbackWaitText'),
 
-  onlineRevealTitle: document.getElementById('onlineRevealTitle'),
-  onlineReplaySoundBtn: document.getElementById('onlineReplaySoundBtn'),
-  onlineGuesserList: document.getElementById('onlineGuesserList'),
-  onlineNextRoundBtn: document.getElementById('onlineNextRoundBtn'),
-  onlineRevealWaitingText: document.getElementById('onlineRevealWaitingText'),
+  // Voting
+  votingTimerRing: document.getElementById('votingTimerRing'),
+  votingTimerValue: document.getElementById('votingTimerValue'),
+  votingGrid: document.getElementById('votingGrid'),
+  voteConfirmText: document.getElementById('voteConfirmText'),
 
+  // Round Results
+  roundResultSoundName: document.getElementById('roundResultSoundName'),
+  roundResultList: document.getElementById('roundResultList'),
+  nextRoundBtn: document.getElementById('nextRoundBtn'),
+  roundResultWaitText: document.getElementById('roundResultWaitText'),
+
+  // End
   onlineFinalScoreboard: document.getElementById('onlineFinalScoreboard'),
   onlineRestartBtn: document.getElementById('onlineRestartBtn'),
   onlineEndWaitingText: document.getElementById('onlineEndWaitingText'),
 };
 
 const onlineAudio = new Audio();
+let playbackAudio = new Audio();
 
 const onlineState = {
   uid: null,
   code: null,
   isHost: false,
-  lastStatus: null,
-  timerInterval: null,
-  guessedThisRound: false,
   peer: null,
   hostConn: null, // used by client
-  clientConns: {}, // used by host, maps uid to connection
-  roomState: null, // used by host (master) and client (replica)
+  clientConns: {}, // used by host
+  roomState: null,
+  
+  // Local state
+  timerInterval: null,
+  votedThisRound: false,
+  selectedSoundIndex: null,
+  
+  // Host data
+  recordings: {}, // uid -> blob
+  currentPlaybackBlob: null,
 };
 
 function getOrCreateUid(){
   let uid = sessionStorage.getItem('echoparty_uid');
   if(!uid){
-    uid = (crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    uid = `p-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     sessionStorage.setItem('echoparty_uid', uid);
   }
   return uid;
@@ -88,12 +106,7 @@ function showOnlineError(message){
   onlineEls.error.hidden = false;
 }
 
-/* --------------------------- Mode / navigation --------------------------- */
-
-els.modeOnlineBtn.addEventListener('click', () => {
-  onlineEls.error.hidden = true;
-  showScreen('online-home');
-});
+/* --------------------------- Navigation Accueil --------------------------- */
 
 onlineEls.tabCreate.addEventListener('click', () => switchOnlineTab('create'));
 onlineEls.tabJoin.addEventListener('click', () => switchOnlineTab('join'));
@@ -106,36 +119,31 @@ function switchOnlineTab(which){
   onlineEls.joinPane.hidden = isCreate;
 }
 
-/* --------------------------- Créer / rejoindre --------------------------- */
+/* --------------------------- Créer / Rejoindre --------------------------- */
 
 onlineEls.createRoomBtn.addEventListener('click', () => {
   const name = onlineEls.createNameInput.value.trim();
   if(!name){ showOnlineError('Entre ton prénom.'); return; }
-  if(state.sounds.length === 0){ showOnlineError('Aucun son disponible.'); return; }
-
+  
   onlineEls.createRoomBtn.disabled = true;
   const uid = getOrCreateUid();
   const code = randomRoomCode();
-  const peerId = 'echoparty-host-' + code;
-
-  onlineState.peer = new Peer(peerId);
   
-  onlineState.peer.on('open', (id) => {
+  onlineState.peer = new Peer('echoparty-host-' + code);
+  
+  onlineState.peer.on('open', () => {
     onlineState.uid = uid;
     onlineState.code = code;
     onlineState.isHost = true;
     onlineState.roomState = {
-      hostId: uid,
-      createdAt: Date.now(),
-      durationSec: parseInt(onlineEls.onlineDurationSelect.value, 10),
       status: 'lobby',
       players: { [uid]: { name, score: 0 } },
       playerOrder: [uid],
-      order: [],
-      cursor: -1,
-      mimeId: null,
+      round: 0,
+      soundIndex: null,
+      playbackCursor: -1,
       timerEndsAt: null,
-      guesses: {},
+      votes: {}, // voterUid -> targetUid
     };
     broadcastState();
     onlineEls.createRoomBtn.disabled = false;
@@ -146,7 +154,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
       if(data.type === 'join'){
         onlineState.clientConns[data.uid] = conn;
         onlineState.roomState.players[data.uid] = { name: data.name, score: 0 };
-        if(!onlineState.roomState.playerOrder.includes(data.uid)){
+        if(!onlineState.roomState.playerOrder.includes(data.uid)) {
           onlineState.roomState.playerOrder.push(data.uid);
         }
         broadcastState();
@@ -154,18 +162,12 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
         handleClientAction(data.uid, data.action);
       }
     });
-    conn.on('close', () => {
-      // Optional: remove player on disconnect
-    });
   });
 
   onlineState.peer.on('error', (err) => {
     console.error(err);
-    if(err.type === 'unavailable-id') {
-      showOnlineError("Le code est déjà utilisé, réessaie.");
-    } else {
-      showOnlineError("Erreur de connexion P2P.");
-    }
+    if(err.type === 'unavailable-id') showOnlineError("Code déjà utilisé, réessaie.");
+    else showOnlineError("Erreur réseau P2P.");
     onlineEls.createRoomBtn.disabled = false;
   });
 });
@@ -173,18 +175,15 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
 onlineEls.joinRoomBtn.addEventListener('click', () => {
   const name = onlineEls.joinNameInput.value.trim();
   const code = onlineEls.joinCodeInput.value.trim().toUpperCase();
-  if(!name){ showOnlineError('Entre ton prénom.'); return; }
-  if(!code){ showOnlineError('Entre le code de la partie.'); return; }
+  if(!name || !code){ showOnlineError('Prénom et code requis.'); return; }
 
   onlineEls.joinRoomBtn.disabled = true;
   const uid = getOrCreateUid();
-  
   onlineState.peer = new Peer();
   
-  onlineState.peer.on('open', (id) => {
-    const hostPeerId = 'echoparty-host-' + code;
-    onlineState.hostConn = onlineState.peer.connect(hostPeerId, { reliable: true });
-
+  onlineState.peer.on('open', () => {
+    onlineState.hostConn = onlineState.peer.connect('echoparty-host-' + code, { reliable: true });
+    
     onlineState.hostConn.on('open', () => {
       onlineState.uid = uid;
       onlineState.code = code;
@@ -194,32 +193,26 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     });
 
     onlineState.hostConn.on('data', (data) => {
-      if(data.type === 'state') {
-        renderRoom(data.state);
-      }
+      if(data.type === 'state') renderRoom(data.state);
+      else if(data.type === 'playback_audio') playReceivedBlob(data.blob, data.uid);
     });
 
-    onlineState.hostConn.on('close', () => {
-      showOnlineError('Connexion avec l\'hôte perdue.');
-    });
+    onlineState.hostConn.on('close', () => showOnlineError('Hôte déconnecté.'));
   });
-  
-  onlineState.peer.on('error', (err) => {
-    console.error(err);
+
+  onlineState.peer.on('error', () => {
     showOnlineError("Impossible de rejoindre la partie. Vérifie le code.");
     onlineEls.joinRoomBtn.disabled = false;
   });
 });
 
-/* ------------------------------ Synchronisation (Hôte) ------------------------------ */
+/* ------------------------------ Sync / Actions (Hôte) ------------------------------ */
 
 function broadcastState() {
   if(!onlineState.isHost) return;
-  const stateCopy = JSON.parse(JSON.stringify(onlineState.roomState));
+  const copy = JSON.parse(JSON.stringify(onlineState.roomState));
   Object.values(onlineState.clientConns).forEach(conn => {
-    if(conn.open) {
-      conn.send({ type: 'state', state: stateCopy });
-    }
+    if(conn.open) conn.send({ type: 'state', state: copy });
   });
   renderRoom(onlineState.roomState);
 }
@@ -230,286 +223,365 @@ function updateRoomState(updates) {
   broadcastState();
 }
 
-function handleClientAction(uid, actionData) {
+function handleClientAction(uid, data) {
   if(!onlineState.isHost) return;
   const room = onlineState.roomState;
   
-  if (actionData.name === 'start_acting') {
-    if (room.mimeId === uid && room.status === 'listen') {
-      updateRoomState({
-        status: 'act',
-        timerEndsAt: Date.now() + room.durationSec * 1000,
-        guesses: {},
-      });
+  if (data.name === 'submit_audio') {
+    if (room.status === 'recording') {
+      // Blobs can be extracted directly (PeerJS deserializes them if supported, or ArrayBuffer)
+      onlineState.recordings[uid] = new Blob([data.blob], { type: data.mimeType || 'audio/webm' });
+      
+      // Check if all players submitted
+      if(Object.keys(onlineState.recordings).length >= room.playerOrder.length) {
+        updateRoomState({ status: 'playback', playbackCursor: 0 });
+        broadcastPlaybackBlob();
+      }
     }
-  } else if (actionData.name === 'guess') {
-    if (room.status === 'act' && !room.guesses[uid] && room.mimeId !== uid) {
-      room.guesses[uid] = true;
+  } else if (data.name === 'vote') {
+    if (room.status === 'voting' && !room.votes[uid]) {
+      room.votes[uid] = data.targetUid;
       broadcastState();
-    }
-  } else if (actionData.name === 'end_acting') {
-    if (room.status === 'act') {
-      updateRoomState({ status: 'reveal' });
-    }
-  } else if (actionData.name === 'listen') {
-    if (room.status === 'intro' && room.mimeId === uid) {
-      updateRoomState({ status: 'listen' });
+      
+      // Check if all voted
+      if(Object.keys(room.votes).length >= room.playerOrder.length) {
+        tallyVotesAndGoToResults();
+      }
     }
   }
 }
 
-function sendAction(actionData) {
-  if (onlineState.isHost) {
-    handleClientAction(onlineState.uid, actionData);
-  } else {
-    if (onlineState.hostConn && onlineState.hostConn.open) {
-      onlineState.hostConn.send({ type: 'action', uid: onlineState.uid, action: actionData });
-    }
-  }
+function sendAction(data) {
+  if (onlineState.isHost) handleClientAction(onlineState.uid, data);
+  else if (onlineState.hostConn?.open) onlineState.hostConn.send({ type: 'action', uid: onlineState.uid, action: data });
 }
 
-/* ------------------------------ Rendu ------------------------------ */
+/* ------------------------------ Rendu Global ------------------------------ */
 
-function renderRoom(room){
+function renderRoom(room) {
   onlineState.roomState = room;
   const players = room.players || {};
-  const playerOrder = room.playerOrder || Object.keys(players);
+  const order = room.playerOrder || Object.keys(players);
   onlineState.isHost = room.hostId === onlineState.uid;
 
   switch(room.status){
-    case 'lobby':
-      renderLobby(room, players, playerOrder);
-      showScreen('online-lobby');
-      break;
-    case 'intro':
-      clearInterval(onlineState.timerInterval);
-      renderIntro(room, players);
-      break;
-    case 'listen':
-      renderListen(room, players);
-      break;
-    case 'act':
-      renderAct(room, players);
-      break;
-    case 'reveal':
-      clearInterval(onlineState.timerInterval);
-      renderReveal(room, players, playerOrder);
-      break;
-    case 'end':
-      clearInterval(onlineState.timerInterval);
-      renderEnd(room, players);
-      break;
+    case 'lobby': renderLobby(room, players, order); break;
+    case 'host_choose': renderHostChoose(room); break;
+    case 'recording': renderRecording(room); break;
+    case 'playback': renderPlayback(room, players); break;
+    case 'voting': renderVoting(room, players); break;
+    case 'round_results': renderRoundResults(room, players); break;
+    case 'end': renderEnd(room, players); break;
   }
-  onlineState.lastStatus = room.status;
 }
 
-function renderLobby(room, players, playerOrder){
+/* ---------------- LOBBY ---------------- */
+function renderLobby(room, players, order){
   onlineEls.roomCodeDisplay.textContent = onlineState.code;
   onlineEls.lobbyPlayerList.innerHTML = '';
-  playerOrder.forEach(uid => {
-    const p = players[uid];
-    if(!p) return;
+  order.forEach(uid => {
     const li = document.createElement('li');
-    li.textContent = p.name + (uid === room.hostId ? ' (hôte)' : '');
+    li.textContent = players[uid].name + (uid === room.hostId ? ' (hôte)' : '');
     onlineEls.lobbyPlayerList.appendChild(li);
   });
-  const canStart = onlineState.isHost && playerOrder.length >= 2 && state.sounds.length > 0;
+  
+  const canStart = onlineState.isHost && order.length >= 2;
   onlineEls.onlineStartBtn.hidden = !onlineState.isHost;
   onlineEls.onlineStartBtn.disabled = !canStart;
   onlineEls.lobbyWaitingText.hidden = onlineState.isHost;
+  showScreen('online-lobby');
 }
 
 onlineEls.onlineStartBtn.addEventListener('click', () => {
-  if (!onlineState.isHost) return;
-  const room = onlineState.roomState;
-  const playerOrder = room.playerOrder || [];
-  const order = state.sounds.map((_, i) => i);
-  shuffle(order);
-  updateRoomState({
-    order,
-    cursor: 0,
-    mimeId: playerOrder[0],
-    status: 'intro',
-    guesses: {},
-  });
+  if(onlineState.isHost) updateRoomState({ status: 'host_choose', round: 1 });
 });
 
-function currentSoundFor(room){
-  const idx = room.order[room.cursor];
-  return state.sounds[idx];
-}
-
-function renderIntro(room, players){
-  const mime = players[room.mimeId];
-  const isMime = room.mimeId === onlineState.uid;
-  els.roundLabel.textContent = `Manche ${room.cursor + 1}`;
+/* ---------------- HOST CHOOSE ---------------- */
+function renderHostChoose(room){
   els.topbarInfo.hidden = false;
-  els.soundsLeftLabel.textContent = `${room.order.length - room.cursor} son${room.order.length - room.cursor > 1 ? 's' : ''} restant${room.order.length - room.cursor > 1 ? 's' : ''}`;
-  renderOnlineScorebar(room, players);
+  els.roundLabel.textContent = `Manche ${room.round}`;
+  renderScorebar(room);
 
-  if(isMime){
-    showScreen('online-listen');
-    onlineState.guessedThisRound = false;
-    onlineEls.onlineGuessedConfirm.hidden = true;
-    onlineEls.onlineGuessedBtn.disabled = false;
+  onlineEls.hostChooseView.hidden = !onlineState.isHost;
+  onlineEls.clientWaitView.hidden = onlineState.isHost;
+  
+  if (onlineState.isHost && onlineEls.hostSoundList.children.length === 0) {
+    // Populate sounds
+    state.sounds.forEach((s, idx) => {
+      const li = document.createElement('li');
+      li.textContent = s.label;
+      const playBtn = document.createElement('button');
+      playBtn.textContent = '▶';
+      playBtn.className = 'btn btn-ghost';
+      playBtn.onclick = (e) => {
+        e.stopPropagation();
+        onlineAudio.src = s.url;
+        onlineAudio.play();
+      };
+      li.appendChild(playBtn);
+      
+      li.onclick = () => {
+        Array.from(onlineEls.hostSoundList.children).forEach(c => c.classList.remove('selected'));
+        li.classList.add('selected');
+        onlineState.selectedSoundIndex = idx;
+        onlineEls.hostConfirmSoundBtn.disabled = false;
+      };
+      onlineEls.hostSoundList.appendChild(li);
+    });
+  }
+  showScreen('host-choose');
+}
+
+onlineEls.hostConfirmSoundBtn.addEventListener('click', () => {
+  if(!onlineState.isHost || onlineState.selectedSoundIndex === null) return;
+  // Compute duration roughly or set fixed prep time + duration
+  // For safety, let's load the audio to get exact duration, but async.
+  const s = state.sounds[onlineState.selectedSoundIndex];
+  const tempA = new Audio(s.url);
+  tempA.onloadedmetadata = () => {
+    const dur = tempA.duration * 1000;
+    onlineState.recordings = {}; // Reset recordings
+    updateRoomState({
+      status: 'recording',
+      soundIndex: onlineState.selectedSoundIndex,
+      timerEndsAt: Date.now() + 2000 + dur // 2s prep + duration
+    });
+  };
+});
+
+/* ---------------- RECORDING ---------------- */
+let mediaRecorder = null;
+let recordingChunks = [];
+let recordingTimeout = null;
+
+function renderRecording(room) {
+  showScreen('recording');
+  onlineEls.recordingStatusText.hidden = true;
+  onlineEls.recordingUploadText.hidden = true;
+  onlineEls.recordingInstruction.textContent = "Préparez-vous...";
+  onlineEls.recordingTimerRing.hidden = false;
+  
+  const originalSound = state.sounds[room.soundIndex];
+  onlineAudio.src = originalSound.url;
+  
+  // Set output device
+  if (typeof onlineAudio.setSinkId === 'function' && state.deviceIdOut !== 'default') {
+    onlineAudio.setSinkId(state.deviceIdOut).catch(e => console.warn(e));
+  }
+
+  const prepTime = room.timerEndsAt - originalSound.url /* wait, we need original duration */
+  // It's safer to just sync by timestamp
+  const now = Date.now();
+  const timeUntilEnd = room.timerEndsAt - now;
+  
+  // Let's assume duration is timeUntilEnd - 2000 roughly if we caught it right away.
+  
+  clearInterval(onlineState.timerInterval);
+  const tick = () => {
+    const left = Math.round((room.timerEndsAt - Date.now()) / 1000);
+    onlineEls.recordingTimerValue.textContent = Math.max(0, left);
+  };
+  tick();
+  onlineState.timerInterval = setInterval(tick, 1000);
+  
+  // Start sequence
+  setTimeout(async () => {
+    onlineEls.recordingInstruction.textContent = "IMITEZ MAINTENANT !";
+    onlineEls.recordingStatusText.hidden = false;
+    onlineEls.recordingWaveform.classList.add('playing');
     
-    if(room.status === 'intro'){
-      sendAction({ name: 'listen' });
+    onlineAudio.play().catch(e=>console.error(e));
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: state.deviceIdIn } } });
+      mediaRecorder = new MediaRecorder(stream);
+      recordingChunks = [];
+      mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType });
+        onlineEls.recordingStatusText.hidden = true;
+        onlineEls.recordingUploadText.hidden = false;
+        sendAction({ name: 'submit_audio', blob, mimeType: mediaRecorder.mimeType });
+      };
+      mediaRecorder.start();
+    } catch(err) {
+      console.error("Microphone error during record:", err);
+      // Still submit empty to unblock host
+      sendAction({ name: 'submit_audio', blob: new Blob([]), mimeType: 'audio/webm' });
     }
-  }else{
-    onlineEls.onlineIntroName.textContent = mime ? mime.name : '—';
-    onlineEls.onlineIntroSub.textContent = 'met son casque et écoute le son en privé…';
-    showScreen('online-intro');
-  }
+  }, Math.max(0, timeUntilEnd > 2000 ? timeUntilEnd - onlineAudio.duration*1000 : 0) || 2000); // 2s delay hardcoded for prep
+
+  // Fallback stop
+  clearTimeout(recordingTimeout);
+  recordingTimeout = setTimeout(() => {
+    onlineEls.recordingWaveform.classList.remove('playing');
+    if(mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  }, Math.max(0, timeUntilEnd));
 }
 
-function renderListen(room, players){
-  const isMime = room.mimeId === onlineState.uid;
-  if(isMime){
-    showScreen('online-listen');
-  }else{
-    const mime = players[room.mimeId];
-    onlineEls.onlineIntroName.textContent = mime ? mime.name : '—';
-    onlineEls.onlineIntroSub.textContent = 'écoute le son au casque, en privé…';
-    showScreen('online-intro');
-  }
+/* ---------------- PLAYBACK ---------------- */
+function broadcastPlaybackBlob() {
+  const room = onlineState.roomState;
+  const targetUid = room.playerOrder[room.playbackCursor];
+  const blob = onlineState.recordings[targetUid];
+  
+  Object.values(onlineState.clientConns).forEach(conn => {
+    if(conn.open && blob) conn.send({ type: 'playback_audio', uid: targetUid, blob });
+  });
+  playReceivedBlob(blob, targetUid);
 }
 
-onlineEls.onlinePlaySoundBtn.addEventListener('click', () => {
-  if (onlineState.roomState) {
-    playOnlineSound(currentSoundFor(onlineState.roomState));
+function playReceivedBlob(blob, targetUid) {
+  if(!blob) return;
+  onlineState.currentPlaybackBlob = new Blob([blob]); // Make sure it's a blob
+  const url = URL.createObjectURL(onlineState.currentPlaybackBlob);
+  playbackAudio.src = url;
+  if (typeof playbackAudio.setSinkId === 'function' && state.deviceIdOut !== 'default') {
+    playbackAudio.setSinkId(state.deviceIdOut).catch(e => console.warn(e));
   }
-});
+  playbackAudio.play().catch(e=>console.error(e));
+  onlineEls.playbackWaveform.classList.add('playing');
+}
 
-function playOnlineSound(sound){
-  onlineAudio.pause();
-  onlineAudio.src = sound.url;
+playbackAudio.onpause = () => onlineEls.playbackWaveform.classList.remove('playing');
+playbackAudio.onended = () => onlineEls.playbackWaveform.classList.remove('playing');
+
+function renderPlayback(room, players){
+  const targetUid = room.playerOrder[room.playbackCursor];
+  const player = players[targetUid];
+  const sound = state.sounds[room.soundIndex];
+  
+  onlineEls.playbackPlayerName.textContent = player ? player.name : "—";
+  onlineEls.playbackOriginalName.textContent = sound ? sound.label : "—";
+  
+  onlineEls.playbackActions.hidden = !onlineState.isHost;
+  onlineEls.playbackWaitText.hidden = onlineState.isHost;
+  
+  showScreen('playback');
+}
+
+onlineEls.playbackReplayOriginalBtn.addEventListener('click', () => {
+  if(!onlineState.isHost) return;
   onlineAudio.currentTime = 0;
-  onlineAudio.play().catch(() => {});
-  onlineEls.onlineWaveform.classList.add('playing');
-}
-onlineAudio.addEventListener('ended', () => onlineEls.onlineWaveform.classList.remove('playing'));
-onlineAudio.addEventListener('pause', () => onlineEls.onlineWaveform.classList.remove('playing'));
-
-onlineEls.onlineStartActingBtn.addEventListener('click', () => {
-  onlineAudio.pause();
-  sendAction({ name: 'start_acting' });
+  onlineAudio.play();
 });
 
-function renderAct(room, players){
-  const isMime = room.mimeId === onlineState.uid;
-  const mime = players[room.mimeId];
-  onlineEls.onlineActPlayerName.textContent = mime ? mime.name : '—';
-  onlineEls.onlineActEyebrow.textContent = isMime ? 'À toi de mimer !' : 'Ça mime, devine à voix haute !';
-  onlineEls.onlineActAsMime.hidden = !isMime;
-  onlineEls.onlineActAsGuesser.hidden = isMime;
+onlineEls.playbackReplayImitationBtn.addEventListener('click', () => {
+  if(!onlineState.isHost) return;
+  broadcastPlaybackBlob();
+});
 
-  if(!isMime){
-    const alreadyGuessed = !!(room.guesses && room.guesses[onlineState.uid]);
-    onlineState.guessedThisRound = alreadyGuessed;
-    onlineEls.onlineGuessedBtn.disabled = alreadyGuessed;
-    onlineEls.onlineGuessedConfirm.hidden = !alreadyGuessed;
+onlineEls.playbackNextBtn.addEventListener('click', () => {
+  if(!onlineState.isHost) return;
+  playbackAudio.pause();
+  const room = onlineState.roomState;
+  if (room.playbackCursor + 1 < room.playerOrder.length) {
+    updateRoomState({ playbackCursor: room.playbackCursor + 1 });
+    broadcastPlaybackBlob();
+  } else {
+    updateRoomState({
+      status: 'voting',
+      timerEndsAt: Date.now() + 15000,
+      votes: {}
+    });
   }
+});
 
-  showScreen('online-act');
+/* ---------------- VOTING ---------------- */
+function renderVoting(room, players){
+  onlineState.votedThisRound = !!room.votes[onlineState.uid];
+  onlineEls.voteConfirmText.hidden = !onlineState.votedThisRound;
+  
+  onlineEls.votingGrid.innerHTML = '';
+  room.playerOrder.forEach(uid => {
+    if(uid === onlineState.uid) return; // Cant vote for self
+    
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary';
+    btn.style.width = '200px';
+    btn.textContent = players[uid].name;
+    btn.disabled = onlineState.votedThisRound;
+    
+    if (room.votes[onlineState.uid] === uid) btn.classList.add('btn-success');
+
+    btn.onclick = () => {
+      sendAction({ name: 'vote', targetUid: uid });
+    };
+    onlineEls.votingGrid.appendChild(btn);
+  });
 
   clearInterval(onlineState.timerInterval);
   const tick = () => {
-    const remaining = Math.max(0, Math.round((room.timerEndsAt - Date.now()) / 1000));
-    onlineEls.onlineTimerValue.textContent = remaining;
-    if(remaining <= 0){
+    const left = Math.max(0, Math.round((room.timerEndsAt - Date.now())/1000));
+    onlineEls.votingTimerValue.textContent = left;
+    if(left <= 0) {
       clearInterval(onlineState.timerInterval);
-      if(isMime && onlineState.isHost) {
-        updateRoomState({ status: 'reveal' });
-      } else if (isMime) {
-        sendAction({ name: 'end_acting' });
-      }
+      if(onlineState.isHost && room.status === 'voting') tallyVotesAndGoToResults();
     }
   };
   tick();
-  onlineState.timerInterval = setInterval(tick, 250);
+  onlineState.timerInterval = setInterval(tick, 1000);
+
+  showScreen('voting');
 }
 
-onlineEls.onlineGuessedBtn.addEventListener('click', () => {
-  if(onlineState.guessedThisRound) return;
-  onlineState.guessedThisRound = true;
-  onlineEls.onlineGuessedBtn.disabled = true;
-  onlineEls.onlineGuessedConfirm.hidden = false;
-  sendAction({ name: 'guess' });
-});
-
-onlineEls.onlineEndActingBtn.addEventListener('click', () => {
-  sendAction({ name: 'end_acting' });
-});
-
-function renderReveal(room, players){
-  const sound = currentSoundFor(room);
-  onlineEls.onlineRevealTitle.textContent = sound.label;
-  onlineEls.onlineGuesserList.innerHTML = '';
-  const guesses = room.guesses || {};
-  const guesserIds = Object.keys(guesses).filter(uid => guesses[uid]);
-  if(guesserIds.length === 0){
-    const li = document.createElement('li');
-    li.textContent = 'Personne cette fois-ci';
-    onlineEls.onlineGuesserList.appendChild(li);
-  }else{
-    guesserIds.forEach(uid => {
-      const p = players[uid];
-      if(!p) return;
-      const li = document.createElement('li');
-      li.textContent = p.name;
-      onlineEls.onlineGuesserList.appendChild(li);
-    });
-  }
-  onlineEls.onlineNextRoundBtn.hidden = !onlineState.isHost;
-  onlineEls.onlineRevealWaitingText.hidden = onlineState.isHost;
-  showScreen('online-reveal');
-}
-
-onlineEls.onlineReplaySoundBtn.addEventListener('click', () => {
-  if(onlineState.roomState){
-    playOnlineSound(currentSoundFor(onlineState.roomState));
-  }
-});
-
-onlineEls.onlineNextRoundBtn.addEventListener('click', () => {
-  if (!onlineState.isHost) return;
+function tallyVotesAndGoToResults() {
+  if(!onlineState.isHost) return;
   const room = onlineState.roomState;
-  const players = room.players || {};
-  const playerOrder = room.playerOrder || Object.keys(players);
-  const guesses = room.guesses || {};
-
-  const updates = {};
-  let anyoneGuessed = false;
+  const newPlayers = JSON.parse(JSON.stringify(room.players));
   
-  const newPlayers = JSON.parse(JSON.stringify(players));
-
-  Object.keys(guesses).forEach(uid => {
-    if(guesses[uid] && newPlayers[uid]){
-      anyoneGuessed = true;
-      newPlayers[uid].score = (newPlayers[uid].score || 0) + 1;
-    }
+  Object.values(room.votes).forEach(targetUid => {
+    if(newPlayers[targetUid]) newPlayers[targetUid].score += 1;
   });
-  if(anyoneGuessed && newPlayers[room.mimeId]){
-    newPlayers[room.mimeId].score = (newPlayers[room.mimeId].score || 0) + 1;
-  }
-  
-  updates.players = newPlayers;
 
-  const nextCursor = room.cursor + 1;
-  if(nextCursor >= room.order.length){
-    updates.status = 'end';
-  }else{
-    const mimePos = playerOrder.indexOf(room.mimeId);
-    const nextMimeId = playerOrder[(mimePos + 1) % playerOrder.length];
-    updates.cursor = nextCursor;
-    updates.mimeId = nextMimeId;
-    updates.status = 'intro';
-    updates.guesses = {};
-  }
-  updateRoomState(updates);
+  updateRoomState({
+    status: 'round_results',
+    players: newPlayers
+  });
+}
+
+/* ---------------- ROUND RESULTS ---------------- */
+function renderRoundResults(room, players){
+  const sound = state.sounds[room.soundIndex];
+  onlineEls.roundResultSoundName.textContent = sound ? sound.label : "—";
+  
+  // Tally votes received this round
+  const votesReceived = {};
+  Object.values(room.votes || {}).forEach(uid => {
+    votesReceived[uid] = (votesReceived[uid] || 0) + 1;
+  });
+
+  onlineEls.roundResultList.innerHTML = '';
+  room.playerOrder.forEach(uid => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${players[uid].name}</span> <span>+${votesReceived[uid] || 0} pts</span>`;
+    onlineEls.roundResultList.appendChild(li);
+  });
+
+  onlineEls.nextRoundBtn.hidden = !onlineState.isHost;
+  onlineEls.roundResultWaitText.hidden = onlineState.isHost;
+
+  renderScorebar(room);
+  showScreen('round-results');
+}
+
+onlineEls.nextRoundBtn.addEventListener('click', () => {
+  if(!onlineState.isHost) return;
+  const room = onlineState.roomState;
+  updateRoomState({
+    status: 'host_choose',
+    round: room.round + 1,
+    soundIndex: null,
+    votes: {},
+    playbackCursor: -1
+  });
 });
 
+/* ---------------- FINAL SCORE ---------------- */
+// Add an explicit 'End Game' button in host_choose if wanted, or just logic
 function renderEnd(room, players){
   const ranked = Object.values(players).sort((a, b) => b.score - a.score);
   onlineEls.onlineFinalScoreboard.innerHTML = '';
@@ -528,26 +600,21 @@ function renderEnd(room, players){
 onlineEls.onlineRestartBtn.addEventListener('click', () => {
   if (!onlineState.isHost) return;
   const room = onlineState.roomState;
-  const players = room.players || {};
-  const newPlayers = JSON.parse(JSON.stringify(players));
-  Object.keys(newPlayers).forEach(uid => { newPlayers[uid].score = 0; });
+  const newPlayers = JSON.parse(JSON.stringify(room.players));
+  Object.keys(newPlayers).forEach(uid => newPlayers[uid].score = 0);
   
   updateRoomState({
     status: 'lobby',
-    order: [],
-    cursor: -1,
-    mimeId: null,
-    timerEndsAt: null,
-    guesses: {},
+    round: 0,
     players: newPlayers
   });
 });
 
-function renderOnlineScorebar(room, players){
+function renderScorebar(room){
   els.scorebar.hidden = false;
   els.scorebar.innerHTML = '';
-  (room.playerOrder || Object.keys(players)).forEach(uid => {
-    const p = players[uid];
+  (room.playerOrder || []).forEach(uid => {
+    const p = room.players[uid];
     if(!p) return;
     const chip = document.createElement('span');
     chip.className = 'chip';

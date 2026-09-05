@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Écho Party — imite le son, fais deviner</title>
+<title>Écho Party — imite le son tous en même temps</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300..900;1,300..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,7 +25,7 @@
   <!-- ÉCRAN : chargement des sons -->
   <section class="screen" id="screen-loading">
     <div class="panel panel-center">
-      <p class="eyebrow-free">On ouvre le dossier <code>son/</code>…</p>
+      <p class="eyebrow-free">On prépare le jeu…</p>
       <div class="spinner" aria-hidden="true"></div>
       <p class="muted" id="loadingDetail">Recherche des fichiers audio dans le dépôt GitHub.</p>
     </div>
@@ -36,121 +36,56 @@
     <div class="panel panel-center">
       <h2>Aucun son trouvé</h2>
       <p class="muted" id="emptyDetail">Ajoute des fichiers <strong>.mp3, .wav, .ogg ou .m4a</strong> dans le dossier <code>son/</code> de ce dépôt, puis republie la page.</p>
-      <p class="muted">En attendant, tu peux aussi choisir un dossier de sons directement depuis ton ordinateur pour tester en local :</p>
+      <p class="muted">Ou teste avec un dossier local :</p>
       <label class="btn btn-secondary file-btn">
-        Choisir un dossier de sons
+        Choisir un dossier
         <input type="file" id="localFolderInput" webkitdirectory directory multiple hidden>
       </label>
       <button class="btn btn-ghost" id="retryBtn">Réessayer</button>
     </div>
   </section>
 
-  <!-- ÉCRAN : choix du mode de jeu -->
-  <section class="screen" id="screen-mode" hidden>
-    <div class="panel panel-center">
-      <h2>Comment voulez-vous jouer ?</h2>
-      <p class="muted"><strong id="soundCountLabel">0 sons</strong> prêts à être devinés.</p>
-      <button class="btn btn-primary btn-big" id="modeLocalBtn">Sur un seul appareil<br><span class="btn-sub">on se le passe à chaque tour</span></button>
-      <button class="btn btn-secondary btn-big" id="modeOnlineBtn">En ligne avec un code<br><span class="btn-sub">chacun son téléphone, même sur place</span></button>
-    </div>
-  </section>
-
-  <!-- ÉCRAN : configuration des joueurs (mode local) -->
-  <section class="screen" id="screen-setup" hidden>
+  <!-- ÉCRAN 0 : CONFIGURATION AUDIO -->
+  <section class="screen" id="screen-audio-setup" hidden>
     <div class="panel">
-      <h2>Qui joue ce soir ?</h2>
-      <p class="muted">Ajoute au moins 2 joueurs. Chacun aura son tour pour imiter un son pendant que les autres devinent.</p>
-      <form id="playerForm" class="player-form">
-        <input type="text" id="playerNameInput" placeholder="Prénom du joueur" maxlength="20" autocomplete="off">
-        <button type="submit" class="btn btn-secondary">Ajouter</button>
-      </form>
-      <ul class="player-list" id="playerList"></ul>
+      <h2>Configuration Audio</h2>
+      <p class="muted">Avant de jouer, configurons ton micro et tes haut-parleurs.</p>
+      
       <div class="setup-row">
-        <label class="setup-option">
-          Durée du mime
-          <select id="durationSelect">
-            <option value="30">30 s</option>
-            <option value="45" selected>45 s</option>
-            <option value="60">60 s</option>
-            <option value="90">90 s</option>
-          </select>
+        <label class="field-label">Microphone
+          <select id="audioInputSelect"></select>
         </label>
       </div>
-      <button class="btn btn-primary btn-big" id="startGameBtn" disabled>Lancer la partie</button>
-    </div>
-  </section>
 
-  <!-- ÉCRAN : annonce du joueur qui imite -->
-  <section class="screen" id="screen-intro" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free">C'est au tour de</p>
-      <h2 class="player-name-big" id="introPlayerName">—</h2>
-      <p class="muted">Passe l'appareil à <span id="introPlayerName2">ce joueur</span> et mets un casque si possible : les autres ne doivent pas entendre le son.</p>
-      <button class="btn btn-primary btn-big" id="readyBtn">J'ai le casque, j'écoute</button>
-    </div>
-  </section>
-
-  <!-- ÉCRAN : écoute privée du son -->
-  <section class="screen" id="screen-listen" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free">Écoute seul·e, ne montre rien</p>
-      <button class="sound-orb" id="playSoundBtn" aria-label="Jouer le son">
-        <span class="waveform" id="waveform">
-          <span></span><span></span><span></span><span></span><span></span>
-        </span>
-      </button>
-      <p class="muted">Tu peux réécouter autant de fois que tu veux.</p>
-      <button class="btn btn-primary btn-big" id="startActingBtn">Prêt·e à mimer !</button>
-    </div>
-  </section>
-
-  <!-- ÉCRAN : mime + devinette (timer visible de tous) -->
-  <section class="screen" id="screen-act" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free" id="actPrompt">Tout le monde regarde, <span id="actPlayerName">—</span> mime le son !</p>
-      <div class="timer-ring" id="timerRing">
-        <span class="timer-value" id="timerValue">45</span>
+      <div class="setup-row">
+        <label class="field-label">Haut-parleur (sortie)
+          <select id="audioOutputSelect"></select>
+        </label>
+        <p class="muted" style="font-size:0.8rem; margin-top:5px;">Si ton navigateur ne supporte pas le changement de sortie, ça utilisera la sortie par défaut.</p>
       </div>
-      <div class="act-actions">
-        <button class="btn btn-success btn-big" id="guessedBtn">Deviné !</button>
-        <button class="btn btn-ghost" id="timeUpBtn">Temps écoulé</button>
+
+      <div class="audio-visualizer-container">
+        <p class="muted">Volume du micro :</p>
+        <div class="meter"><div class="meter-fill" id="micMeterFill"></div></div>
+      </div>
+
+      <div class="audio-test-actions" style="margin-top:20px;">
+        <button class="btn btn-secondary" id="testMicBtn">M'entendre (Test)</button>
+        <p class="muted" id="testMicStatus" hidden>Test en cours... parle !</p>
+      </div>
+
+      <div style="margin-top: 30px;">
+        <button class="btn btn-primary btn-big" id="confirmAudioBtn">C'est tout bon !</button>
       </div>
     </div>
   </section>
 
-  <!-- ÉCRAN : révélation + attribution des points -->
-  <section class="screen" id="screen-reveal" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free">Le son était</p>
-      <h2 class="reveal-title" id="revealTitle">—</h2>
-      <button class="btn btn-ghost" id="replaySoundBtn">Réécouter</button>
-
-      <div class="points-block">
-        <p class="muted">Qui a deviné juste ? (le mime gagne un point si oui)</p>
-        <div class="points-grid" id="pointsGrid"></div>
-      </div>
-
-      <button class="btn btn-primary btn-big" id="nextRoundBtn">Manche suivante</button>
-    </div>
-  </section>
-
-  <!-- ÉCRAN : classement final -->
-  <section class="screen" id="screen-end" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free">Plus de sons dans le dossier</p>
-      <h2>La partie est finie !</h2>
-      <ol class="scoreboard" id="finalScoreboard"></ol>
-      <button class="btn btn-primary btn-big" id="restartBtn">Rejouer</button>
-    </div>
-  </section>
-
-  <!-- ============ MODE EN LIGNE ============ -->
-
-  <!-- ÉCRAN : créer / rejoindre une partie -->
+  <!-- ÉCRAN 1 : ACCUEIL MULTIJOUEUR -->
   <section class="screen" id="screen-online-home" hidden>
     <div class="panel">
-      <h2>Rejoindre ou créer une partie</h2>
+      <h2>Créer ou rejoindre une partie</h2>
       <p class="muted" id="onlineSetupError" hidden></p>
+      <p class="muted"><strong id="soundCountLabel">0 sons</strong> disponibles.</p>
 
       <div class="online-tabs">
         <button class="tab-btn active" id="tabCreate">Créer</button>
@@ -160,14 +95,6 @@
       <div id="createPane">
         <label class="field-label">Ton prénom
           <input type="text" id="createNameInput" maxlength="20" autocomplete="off" placeholder="Ton prénom">
-        </label>
-        <label class="field-label">Durée du mime
-          <select id="onlineDurationSelect">
-            <option value="30">30 s</option>
-            <option value="45" selected>45 s</option>
-            <option value="60">60 s</option>
-            <option value="90">90 s</option>
-          </select>
         </label>
         <button class="btn btn-primary btn-big" id="createRoomBtn">Créer la partie</button>
       </div>
@@ -184,83 +111,119 @@
     </div>
   </section>
 
-  <!-- ÉCRAN : salon d'attente -->
+  <!-- ÉCRAN 2 : LOBBY -->
   <section class="screen" id="screen-online-lobby" hidden>
     <div class="panel panel-center">
       <p class="eyebrow-free">Code de la partie</p>
       <h2 class="room-code" id="roomCodeDisplay">ABCD</h2>
-      <p class="muted">Donne ce code aux autres joueurs pour qu'ils vous rejoignent depuis leur téléphone.</p>
+      <p class="muted">Donne ce code aux autres pour qu'ils te rejoignent.</p>
       <ul class="player-list" id="lobbyPlayerList"></ul>
       <button class="btn btn-primary btn-big" id="onlineStartBtn" hidden>Lancer la partie</button>
       <p class="muted" id="lobbyWaitingText">En attente que l'hôte lance la partie…</p>
     </div>
   </section>
 
-  <!-- ÉCRAN : annonce du tour (en ligne) -->
-  <section class="screen" id="screen-online-intro" hidden>
-    <div class="panel panel-center">
-      <p class="eyebrow-free">C'est au tour de</p>
-      <h2 class="player-name-big" id="onlineIntroName">—</h2>
-      <p class="muted" id="onlineIntroSub">met son casque et écoute le son en privé…</p>
+  <!-- ÉCRAN 3 : CHOIX DU SON (HÔTE SEULEMENT) OU ATTENTE -->
+  <section class="screen" id="screen-host-choose" hidden>
+    <div class="panel">
+      <div id="hostChooseView" hidden>
+        <h2>Choisis le son de cette manche</h2>
+        <p class="muted">Écoute un son pour le tester, puis valide.</p>
+        <ul class="sound-list" id="hostSoundList">
+          <!-- Populated dynamically -->
+        </ul>
+        <div style="margin-top:20px; display:flex; gap:10px;">
+           <button class="btn btn-primary btn-big" id="hostConfirmSoundBtn" disabled>Choisir ce son</button>
+        </div>
+      </div>
+      <div id="clientWaitView" class="panel-center" hidden>
+        <h2>Prépare-toi !</h2>
+        <p class="muted">L'hôte choisit le son pour cette manche...</p>
+        <div class="spinner" aria-hidden="true" style="margin:20px auto;"></div>
+      </div>
     </div>
   </section>
 
-  <!-- ÉCRAN : écoute privée (en ligne, visible seulement par le mime) -->
-  <section class="screen" id="screen-online-listen" hidden>
+  <!-- ÉCRAN 4 : RECORDING (ÉCOUTE ET IMITATION) -->
+  <section class="screen" id="screen-recording" hidden>
     <div class="panel panel-center">
-      <p class="eyebrow-free">À toi d'écouter</p>
-      <button class="sound-orb" id="onlinePlaySoundBtn" aria-label="Jouer le son">
-        <span class="waveform" id="onlineWaveform">
+      <h2>Prêt ? Écoute et Imite !</h2>
+      <p class="muted" id="recordingInstruction">Le son va être joué. Imite-le en même temps !</p>
+      
+      <div class="sound-orb" id="recordingOrb" style="margin: 30px auto; transform: scale(1.5);">
+        <span class="waveform" id="recordingWaveform">
           <span></span><span></span><span></span><span></span><span></span>
         </span>
-      </button>
-      <p class="muted">Réécoute autant de fois que tu veux, personne d'autre ne l'entend.</p>
-      <button class="btn btn-primary btn-big" id="onlineStartActingBtn">Prêt·e à mimer !</button>
+      </div>
+
+      <div class="timer-ring" id="recordingTimerRing" hidden>
+        <span class="timer-value" id="recordingTimerValue">0</span>
+      </div>
+      
+      <p class="muted" id="recordingStatusText" style="color:var(--primary); font-weight:bold;" hidden>ENREGISTREMENT EN COURS...</p>
+      <p class="muted" id="recordingUploadText" hidden>Envoi de ton imitation...</p>
     </div>
   </section>
 
-  <!-- ÉCRAN : mime en cours (en ligne, contenu différent mime / devineurs) -->
-  <section class="screen" id="screen-online-act" hidden>
+  <!-- ÉCRAN 5 : PLAYBACK (ÉCOUTE DES IMITATIONS) -->
+  <section class="screen" id="screen-playback" hidden>
     <div class="panel panel-center">
-      <p class="eyebrow-free" id="onlineActEyebrow">Ça mime !</p>
-      <h2 class="player-name-big" id="onlineActPlayerName" style="font-size:1.8rem;">—</h2>
-      <div class="timer-ring" id="onlineTimerRing">
-        <span class="timer-value" id="onlineTimerValue">45</span>
+      <p class="eyebrow-free">On écoute</p>
+      <h2 class="player-name-big" id="playbackPlayerName">—</h2>
+      <p class="muted">Le son original était : <strong id="playbackOriginalName">—</strong></p>
+
+      <div class="sound-orb" style="margin: 20px auto;">
+        <span class="waveform" id="playbackWaveform">
+          <span></span><span></span><span></span><span></span><span></span>
+        </span>
       </div>
 
-      <div id="onlineActAsMime" hidden>
-        <p class="muted">Mime le son, les autres devinent à voix haute.</p>
-        <button class="btn btn-ghost" id="onlineEndActingBtn">Terminer maintenant</button>
+      <div class="act-actions" id="playbackActions" hidden>
+        <button class="btn btn-secondary" id="playbackReplayOriginalBtn">Rejouer l'original</button>
+        <button class="btn btn-secondary" id="playbackReplayImitationBtn">Rejouer l'imitation</button>
+        <button class="btn btn-primary" id="playbackNextBtn">Imitation suivante</button>
       </div>
-
-      <div id="onlineActAsGuesser" hidden>
-        <p class="muted">Devine à voix haute ! Tape le bouton si tu trouves.</p>
-        <button class="btn btn-success btn-big" id="onlineGuessedBtn">J'ai deviné !</button>
-        <p class="muted" id="onlineGuessedConfirm" hidden>Bravo, c'est noté ✓</p>
-      </div>
+      <p class="muted" id="playbackWaitText" hidden>L'hôte contrôle l'écoute...</p>
     </div>
   </section>
 
-  <!-- ÉCRAN : révélation (en ligne) -->
-  <section class="screen" id="screen-online-reveal" hidden>
+  <!-- ÉCRAN 6 : VOTING -->
+  <section class="screen" id="screen-voting" hidden>
     <div class="panel panel-center">
-      <p class="eyebrow-free">Le son était</p>
-      <h2 class="reveal-title" id="onlineRevealTitle">—</h2>
-      <button class="btn btn-ghost" id="onlineReplaySoundBtn">Réécouter</button>
-      <div class="points-block">
-        <p class="muted">Ont deviné juste :</p>
-        <ul class="player-list" id="onlineGuesserList"></ul>
+      <h2>Votez !</h2>
+      <p class="muted">Quelle était la meilleure imitation ? (15 secondes)</p>
+      
+      <div class="timer-ring" id="votingTimerRing" style="width:60px; height:60px; margin: 10px auto;">
+        <span class="timer-value" id="votingTimerValue" style="font-size:1.5rem;">15</span>
       </div>
-      <button class="btn btn-primary btn-big" id="onlineNextRoundBtn" hidden>Manche suivante</button>
-      <p class="muted" id="onlineRevealWaitingText" hidden>En attente que l'hôte lance la manche suivante…</p>
+
+      <div class="points-grid" id="votingGrid" style="display: flex; flex-direction: column; gap:10px; align-items:center;">
+        <!-- Boutons de vote -->
+      </div>
+      <p class="muted" id="voteConfirmText" style="color:var(--success); font-weight:bold; margin-top:20px;" hidden>Ton vote est enregistré !</p>
     </div>
   </section>
 
-  <!-- ÉCRAN : classement final (en ligne) -->
+  <!-- ÉCRAN 7 : ROUND RESULTS -->
+  <section class="screen" id="screen-round-results" hidden>
+    <div class="panel panel-center">
+      <h2>Résultats de la manche</h2>
+      <p class="muted">Le son original était : <strong id="roundResultSoundName">—</strong></p>
+      
+      <ul class="player-list" id="roundResultList" style="margin-top:20px;"></ul>
+
+      <div style="margin-top:30px;">
+        <button class="btn btn-primary btn-big" id="nextRoundBtn" hidden>Manche suivante</button>
+        <p class="muted" id="roundResultWaitText" hidden>En attente de l'hôte...</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÉCRAN 8 : FINAL SCORE -->
   <section class="screen" id="screen-online-end" hidden>
     <div class="panel panel-center">
-      <p class="eyebrow-free">Plus de sons dans le dossier</p>
-      <h2>La partie est finie !</h2>
+      <p class="eyebrow-free">Partie terminée</p>
+      <h2>Classement Final</h2>
       <ol class="scoreboard" id="onlineFinalScoreboard"></ol>
       <button class="btn btn-primary btn-big" id="onlineRestartBtn" hidden>Rejouer</button>
       <p class="muted" id="onlineEndWaitingText" hidden>En attente que l'hôte relance une partie…</p>
