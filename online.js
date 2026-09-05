@@ -214,7 +214,7 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     if(onlineState.peer) onlineState.peer.destroy();
   }, 15000);
 
-  onlineState.peer = new Peer(peerConfig);
+  onlineState.peer = new Peer(null, peerConfig);
   
   onlineState.peer.on('open', () => {
     // Petit délai pour laisser le temps au serveur PeerJS d'enregistrer le client
