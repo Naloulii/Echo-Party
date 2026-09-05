@@ -320,8 +320,10 @@ function renderRecording(room) {
     onlineEls.recordingTimerValue.textContent = left;
   }, 500);
 
-  const prepDelay = Math.max(500, timeUntilEnd - (sound ? 0 : 0) - 100);
-  // On attend 2s (délai de préparation), puis on joue et enregistre
+  // Le serveur a ajouté 2000ms au timer. Moins un peu de latence réseau, on donne ~1800ms de prep
+  const prepDelay = 1800;
+  
+  // On attend le délai de préparation, puis on joue et enregistre
   setTimeout(async () => {
     onlineEls.recordingInstruction.textContent = 'IMITEZ MAINTENANT !';
     onlineEls.recordingStatusText.hidden = false;
