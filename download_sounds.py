@@ -20,9 +20,9 @@ from difflib import SequenceMatcher
 # ─── CONFIGURATION ───────────────────────────────────────────
 OUTPUT_DIR      = os.path.join(os.path.dirname(__file__), 'son')
 MAX_DURATION    = 5.0          # secondes max
-SIMILARITY_THRESHOLD = 0.75   # 0-1 : seuil de détection doublon
-PAGES_TO_SCAN   = 30            # nombre de pages de tendances à scanner
-DELAY_BETWEEN   = 0.4          # délai entre chaque téléchargement (s)
+SIMILARITY_THRESHOLD = 0.50   # 0-1 : seuil de détection doublon
+PAGES_TO_SCAN   = 100            # nombre de pages de tendances à scanner
+DELAY_BETWEEN   = 0.2          # délai entre chaque téléchargement (s)
 BASE_URL        = 'https://www.myinstants.com'
 TRENDING_URL    = BASE_URL + '/fr/index/fr/?page={page}'
 HEADERS         = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
