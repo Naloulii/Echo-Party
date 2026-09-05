@@ -185,7 +185,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
 
 onlineEls.joinRoomBtn.addEventListener('click', () => {
   const name = onlineEls.joinNameInput.value.trim();
-  const code = onlineEls.joinCodeInput.value.trim().toUpperCase();
+  const code = onlineEls.joinCodeInput.value.replace(/\s/g, '').toUpperCase();
   if(!name || !code){ showOnlineError('Prénom et code requis.'); return; }
 
   onlineEls.joinRoomBtn.disabled = true;
