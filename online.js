@@ -136,6 +136,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
     onlineState.code = code;
     onlineState.isHost = true;
     onlineState.roomState = {
+      hostId: uid,
       status: 'lobby',
       players: { [uid]: { name, score: 0 } },
       playerOrder: [uid],
