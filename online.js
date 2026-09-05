@@ -178,7 +178,7 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
   onlineState.peer.on('error', (err) => {
     console.error(err);
     if(err.type === 'unavailable-id') showOnlineError("Code déjà utilisé, réessaie.");
-    else showOnlineError("Erreur réseau P2P.");
+    else showOnlineError("Erreur Hôte : " + err.type + " - " + err.message);
     onlineEls.createRoomBtn.disabled = false;
   });
 });
@@ -221,7 +221,7 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
     onlineState.hostConn.on('error', (err) => {
       clearTimeout(joinTimeout);
       console.error("Connection error:", err);
-      showOnlineError("Erreur de connexion avec l'hôte.");
+      showOnlineError("Erreur de connexion : " + err.type + " - " + err.message);
       onlineEls.joinRoomBtn.disabled = false;
     });
   });
@@ -229,7 +229,7 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
   onlineState.peer.on('error', (err) => {
     clearTimeout(joinTimeout);
     console.error("PeerJS error:", err);
-    showOnlineError("Impossible de rejoindre la partie. Vérifie le code.");
+    showOnlineError("Erreur PeerJS : " + err.type + " - " + err.message);
     onlineEls.joinRoomBtn.disabled = false;
   });
 });
