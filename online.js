@@ -3,7 +3,6 @@
    Le serveur relais est sur Render.com
 ------------------------------------------------------------------- */
 
-// ⚠️ Remplacer par l'URL de votre serveur Render une fois déployé
 const SERVER_URL = 'https://echoparty-server.onrender.com';
 
 const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
