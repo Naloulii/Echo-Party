@@ -152,6 +152,9 @@ onlineEls.joinRoomBtn.addEventListener('click', () => {
 
 /* ─────────────── RENDU GLOBAL ─────────────── */
 function renderRoom(room) {
+  const prevStatus = onlineState.roomState?.status;
+  const prevSoundIndex = onlineState.roomState?.soundIndex;
+  
   onlineState.roomState = room;
   onlineState.isHost = room.hostId === onlineState.uid;
   const players = room.players || {};
@@ -159,7 +162,10 @@ function renderRoom(room) {
   switch (room.status) {
     case 'lobby':       renderLobby(room, players); break;
     case 'host_choose': renderHostChoose(room); break;
-    case 'recording':   renderRecording(room); break;
+    case 'recording':   
+      if (prevStatus === 'recording' && prevSoundIndex === room.soundIndex) return;
+      renderRecording(room); 
+      break;
     case 'playback':    renderPlayback(room, players); break;
     case 'voting':      renderVoting(room, players); break;
     case 'round_results': renderRoundResults(room, players); break;
@@ -296,7 +302,6 @@ let recordingChunks = [];
 let recordingTimeout = null;
 
 function renderRecording(room) {
-  if (onlineState.roomState?.status === 'recording' && room.status === 'recording' && onlineState.roomState.soundIndex === room.soundIndex) return;
   showScreen('recording');
   onlineEls.recordingStatusText.hidden = true;
   onlineEls.recordingUploadText.hidden = true;
