@@ -16,6 +16,8 @@ const onlineEls = {
   createNameInput: document.getElementById('createNameInput'),
   createRoomBtn: document.getElementById('createRoomBtn'),
   joinNameInput: document.getElementById('joinNameInput'),
+  joinCodeInput: document.getElementById('joinCodeInput'),
+  joinRoomBtn: document.getElementById('joinRoomBtn'),
   roomCodeDisplay: document.getElementById('roomCodeDisplay'),
   lobbyPlayerList: document.getElementById('lobbyPlayerList'),
   lobbyHostButtons: document.getElementById('lobbyHostButtons'),
