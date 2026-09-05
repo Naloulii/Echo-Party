@@ -151,6 +151,9 @@ onlineEls.createRoomBtn.addEventListener('click', () => {
   });
 
   onlineState.peer.on('connection', (conn) => {
+    conn.on('open', () => {
+      console.log("Connection opened on host side for", conn.peer);
+    });
     conn.on('data', (data) => {
       if(data.type === 'join'){
         onlineState.clientConns[data.uid] = conn;
