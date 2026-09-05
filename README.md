@@ -41,36 +41,13 @@ un joueur crée la partie et reçoit un code à 4 lettres, les autres le rejoign
 L'avantage : c'est le téléphone du mime qui joue le son en privé — plus besoin de se passer
 l'appareil ni de partager un casque.
 
-Comme GitHub Pages ne peut pas faire tourner de serveur, ce mode s'appuie sur **Firebase
-Realtime Database** (gratuit, sans carte bancaire) pour synchroniser les parties en temps réel.
-Il faut relier ton propre projet Firebase une seule fois :
+Le mode en ligne utilise la technologie P2P (Peer-to-Peer) via **PeerJS**. Cela signifie que les téléphones se connectent directement entre eux, sans base de données centrale.
 
-1. Va sur [console.firebase.google.com](https://console.firebase.google.com) et crée un projet
-   (gratuit, quelques clics, aucune carte bancaire demandée).
-2. Dans le projet, ouvre **Build → Realtime Database**, clique sur **Créer une base de
-   données**, choisis un emplacement, puis démarre **en mode test** (règles ouvertes).
-3. Dans les réglages du projet (icône ⚙️ → **Paramètres du projet**), descends jusqu'à
-   **Vos applications**, clique sur l'icône `</>` (Web) pour enregistrer une application, donne-lui
-   un nom, puis copie l'objet `firebaseConfig` affiché.
-4. Colle ces valeurs dans le fichier [`firebase-config.js`](./firebase-config.js) de ce dépôt, à
-   la place des `"REMPLACE_MOI"`.
-5. Republie le dépôt (`git add`, `commit`, `push`) : le bouton « En ligne avec un code » fonctionne
-   désormais.
-6. Dans **Realtime Database → Règles**, tu peux ensuite remplacer les règles de test (qui
-   expirent après 30 jours) par celles-ci, qui restent ouvertes indéfiniment — suffisant pour un
-   jeu entre amis, le code de partie servant de mot de passe informel :
-   ```json
-   {
-     "rules": {
-       "rooms": {
-         "$code": {
-           ".read": true,
-           ".write": true
-         }
-       }
-     }
-   }
-   ```
+1. L'hôte crée une partie et obtient un code de 4 lettres (ex: `ABCD`).
+2. Les autres joueurs rejoignent la partie en entrant ce code.
+3. C'est tout ! L'état du jeu est synchronisé automatiquement par le téléphone de l'hôte.
+
+*Note : L'hôte doit garder la page ouverte pendant toute la partie.*
 
 ### Comment se déroule une manche en ligne
 
@@ -104,8 +81,7 @@ Il faut relier ton propre projet Firebase une seule fois :
 index.html          → structure des écrans du jeu (local + en ligne)
 style.css           → identité visuelle
 script.js           → chargement des sons + logique du mode "un seul appareil"
-online.js           → logique du mode "en ligne avec un code" (Firebase)
-firebase-config.js  → tes clés Firebase (à remplir, voir "Mode en ligne")
+online.js           → logique du mode "en ligne avec un code" (P2P via PeerJS)
 son/                → dépose ici tes fichiers audio
 ```
 

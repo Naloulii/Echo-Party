@@ -15,6 +15,14 @@
 
 *{ box-sizing: border-box; }
 
+/* Le bug de l'écran empilé venait d'ici : nos classes (.screen, .scorebar,
+   .topbar-info) imposent display:flex avec la même spécificité que la règle
+   native [hidden]{display:none}, qui perdait donc systématiquement. On force
+   ici que "hidden" gagne toujours, quel que soit l'élément concerné. */
+[hidden]{
+  display: none !important;
+}
+
 html,body{
   margin:0;
   padding:0;
