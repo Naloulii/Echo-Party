@@ -27,6 +27,7 @@ io.on('connection', (socket) => {
     }
     myRoom = code;
     myUid = uid;
+    socket._uid = uid; // pour le routing WebRTC
     isHost = true;
     rooms[code] = {
       hostSocketId: socket.id,
@@ -62,6 +63,7 @@ io.on('connection', (socket) => {
     }
     myRoom = code;
     myUid = uid;
+    socket._uid = uid; // pour le routing WebRTC
     isHost = false;
     room.state.players[uid] = { name, score: 0 };
     if (!room.state.playerOrder.includes(uid)) room.state.playerOrder.push(uid);
@@ -133,6 +135,23 @@ io.on('connection', (socket) => {
     const room = rooms[myRoom];
     if (!room || room.hostUid !== myUid) return;
     tallyVotes(myRoom);
+  });
+
+  /* ─────────────── SIGNAL WEBRTC (vocal temps réel) ─────────────── */
+  socket.on('signal', ({ toUid, data }) => {
+    const room = rooms[myRoom];
+    if (!room) return;
+    // Trouver le socket de l'autre joueur dans la salle
+    const socketsInRoom = io.sockets.adapter.rooms.get(myRoom);
+    if (!socketsInRoom) return;
+    // On envoie le signal à tous les sockets dans la salle qui ont le bon uid
+    for (const sid of socketsInRoom) {
+      const targetSocket = io.sockets.sockets.get(sid);
+      if (targetSocket && targetSocket._uid === toUid) {
+        targetSocket.emit('signal', { fromUid: myUid, data });
+        break;
+      }
+    }
   });
 
   /* ─────────────── DÉCONNEXION ─────────────── */

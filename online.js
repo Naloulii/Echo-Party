@@ -159,6 +159,15 @@ function renderRoom(room) {
   onlineState.isHost = room.hostId === onlineState.uid;
   const players = room.players || {};
 
+  // Lancer la voix dès qu'on entre dans une salle
+  if (onlineState.uid) {
+    startVoiceChat(onlineState.uid, room.playerOrder || []);
+    syncVoicePeers(onlineState.uid, room);
+  }
+
+  // Couper le micro voix pendant l'enregistrement du jeu (éviter l'écho)
+  muteVoice(room.status === 'recording');
+
   switch (room.status) {
     case 'lobby':       renderLobby(room, players); break;
     case 'host_choose': renderHostChoose(room); break;
